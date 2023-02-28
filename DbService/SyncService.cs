@@ -14,6 +14,9 @@ namespace DbService
         {
             _logger = logger;
         }
+        /// <summary>
+        /// Executing methods to sync the data
+        /// </summary>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -42,7 +45,9 @@ namespace DbService
                 await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
             }
         }
-
+        /// <summary>
+        /// Synchronize country tables
+        /// </summary>
         private async Task SyncCountriesAsync()
         {
             await using var _externalDbContext = new ExternalDbContext();
@@ -85,6 +90,9 @@ namespace DbService
             await _dbContext.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Synchronize city tables
+        /// </summary>
         private async Task SyncCitiesAsync()
         {
             await using var _externalDbContext = new ExternalDbContext();
@@ -133,6 +141,9 @@ namespace DbService
             await _externalDbContext.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Synchronize office tables
+        /// </summary>
         private async Task SyncOfficesAsync()
         {
             await using var _externalDbContext = new ExternalDbContext();
