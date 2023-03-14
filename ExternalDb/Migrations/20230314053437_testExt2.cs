@@ -5,7 +5,7 @@
 namespace ExternalDb.Migrations
 {
     /// <inheritdoc />
-    public partial class test : Migration
+    public partial class testExt2 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -46,11 +46,9 @@ namespace ExternalDb.Migrations
                 name: "ExternalOffices",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Id = table.Column<int>(type: "int", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CityId = table.Column<int>(type: "int", nullable: false),
-                    ExternalCountryId = table.Column<int>(type: "int", nullable: true)
+                    CityId = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -61,11 +59,6 @@ namespace ExternalDb.Migrations
                         principalTable: "ExternalCities",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_ExternalOffices_ExternalCountries_ExternalCountryId",
-                        column: x => x.ExternalCountryId,
-                        principalTable: "ExternalCountries",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateIndex(
@@ -77,11 +70,6 @@ namespace ExternalDb.Migrations
                 name: "IX_ExternalOffices_CityId",
                 table: "ExternalOffices",
                 column: "CityId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ExternalOffices_ExternalCountryId",
-                table: "ExternalOffices",
-                column: "ExternalCountryId");
         }
 
         /// <inheritdoc />

@@ -1,4 +1,5 @@
-﻿
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
 namespace ExternalDb.Entities
 {
     public class ExternalOffice
@@ -6,6 +7,7 @@ namespace ExternalDb.Entities
         /// <summary>
         /// Gets or sets the id of external office table
         /// </summary>
+        [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int Id { get; set; }
 
         /// <summary>

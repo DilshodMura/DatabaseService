@@ -2,7 +2,9 @@
 using ExternalDb.Entities;
 using InternalDb;
 using InternalDb.Entities;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace DbService
 {
@@ -73,14 +75,108 @@ namespace DbService
             foreach (var id in missingIds)
             {
                 var externalCountry = externalCountries.First(c => c.Id == id);
-                var internalCountry = new InternalCountry {Id = externalCountry.Id, Name = externalCountry.Name };
+                var internalCountry = new InternalCountry { Id = externalCountry.Id, Name = externalCountry.Name };
                 _dbContext.InternalCountries.Add(internalCountry);
             }
+            var createTableSql = @"
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DeletedCountries')
+                BEGIN
+                    CREATE TABLE DeletedCountries (
+                        Id INT PRIMARY KEY,
+                        Name NVARCHAR(100) NOT NULL
+                    )
+                END
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DeletedCities')
+                BEGIN
+                    CREATE TABLE DeletedCities (
+                    Id INT PRIMARY KEY,
+                    Name NVARCHAR(100) NOT NULL,
+                    CountryId INT NOT NULL
+                )
+                END
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DeletedOffices')
+                BEGIN
+                    CREATE TABLE DeletedOffices (
+                    Id INT PRIMARY KEY,
+                    Name NVARCHAR(100) NOT NULL,
+                    CityId INT NOT NULL
+                )
+                END
+            ";
+
+            _dbContext.Database.ExecuteSqlRaw(createTableSql);
+            _externalDbContext.Database.ExecuteSqlRaw(createTableSql);
+
+            var insertDeletedCountrySql = @"
+                INSERT INTO DeletedCountries (Id, Name)
+                VALUES (@id, @name)
+            ";
+            var insertDeletedCitySql = @"
+                INSERT INTO DeletedCities (Id, Name, CountryId)
+                VALUES (@id, @name, @countryId)
+            ";
+            var insertDeletedOfficeSql = @"
+                INSERT INTO DeletedOffices (Id, Name, CityId)
+                VALUES (@id, @name, @cityId)
+            ";
+
+            var parameters = new[]
+            {
+                new SqlParameter("@id", SqlDbType.Int),
+                new SqlParameter("@name", SqlDbType.NVarChar, 100),
+                new SqlParameter("@countryId", SqlDbType.Int),
+                new SqlParameter("@cityId", SqlDbType.Int)
+            };
+
             foreach (var id in extraIds)
             {
                 var internalCountry = internalCountries.First(c => c.Id == id);
+
+                // Set the parameter values for the SQL command
+                parameters[0].Value = internalCountry.Id;
+                parameters[1].Value = internalCountry.Name;
+                parameters[2].Value = 0;
+                parameters[3].Value = 0;
+                // Execute the SQL command using ExecuteSqlRaw
+                _dbContext.Database.ExecuteSqlRaw(insertDeletedCountrySql, parameters);
+                _externalDbContext.Database.ExecuteSqlRaw(insertDeletedCountrySql, parameters);
+
+                // Remove the deleted country from the internal database
                 _dbContext.InternalCountries.Remove(internalCountry);
+
+                // Remove linked cities and offices from the internal database
+                var internalCities = await _dbContext.InternalCities.Where(c => c.CountryId == internalCountry.Id).ToListAsync();
+                foreach (var internalCity in internalCities)
+                {
+                    parameters[0].Value = internalCity.Id;
+                    parameters[1].Value = internalCity.Name;
+                    parameters[2].Value = internalCity.CountryId;
+
+                    // Execute the SQL command using ExecuteSqlRaw
+                    _dbContext.Database.ExecuteSqlRaw(insertDeletedCitySql, parameters);
+                    _externalDbContext.Database.ExecuteSqlRaw(insertDeletedCitySql, parameters);
+
+                    // Remove linked offices from the internal database
+                    var internalOffices = await _dbContext.InternalOffices.Where(o => o.CityId == internalCity.Id).ToListAsync();
+                    foreach (var internalOffice in internalOffices)
+                    {
+                        parameters[0].Value = internalOffice.Id;
+                        parameters[1].Value = internalOffice.Name;
+                        parameters[3].Value = internalOffice.CityId;
+
+                        // Execute the SQL command using ExecuteSqlRaw
+                        _dbContext.Database.ExecuteSqlRaw(insertDeletedOfficeSql, parameters);
+                        _externalDbContext.Database.ExecuteSqlRaw(insertDeletedOfficeSql, parameters);
+
+                        // Remove the deleted office from the internal database
+                        _dbContext.InternalOffices.Remove(internalOffice);
+                    }
+
+                    // Remove the deleted city from the internal database
+                    _dbContext.InternalCities.Remove(internalCity);
+                }
             }
+
             foreach (var id in modifiedIds)
             {
                 var externalCountry = externalCountries.First(c => c.Id == id);
@@ -164,8 +260,9 @@ namespace DbService
                     // If the office does not exist in the external database, create a new one
                     externalOffice = new ExternalOffice
                     {
+                        Id = internalOffice.Id,
                         Name = internalOffice.Name,
-                        CityId = internalOffice.CityId
+                        CityId = internalOffice.CityId,
                     };
                     _externalDbContext.ExternalOffices.Add(externalOffice);
                 }

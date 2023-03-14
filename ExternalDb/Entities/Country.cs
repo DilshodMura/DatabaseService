@@ -19,10 +19,5 @@ namespace ExternalDb.Entities
         /// Gets or sets the list of cities for external country table
         /// </summary>
         public List<ExternalCity> Cities { get; set; } = new List<ExternalCity>();
-
-        /// <summary>
-        /// Gets or sets the list of offices for external country table
-        /// </summary>
-        public List<ExternalOffice> Offices { get; set; } = new List<ExternalOffice>();
     }
 }

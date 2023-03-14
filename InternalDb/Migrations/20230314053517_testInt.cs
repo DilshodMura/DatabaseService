@@ -5,7 +5,7 @@
 namespace InternalDb.Migrations
 {
     /// <inheritdoc />
-    public partial class test : Migration
+    public partial class testInt : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -49,8 +49,7 @@ namespace InternalDb.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CityId = table.Column<int>(type: "int", nullable: false),
-                    InternalCountryId = table.Column<int>(type: "int", nullable: true)
+                    CityId = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -61,11 +60,6 @@ namespace InternalDb.Migrations
                         principalTable: "InternalCities",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_InternalOffices_InternalCountries_InternalCountryId",
-                        column: x => x.InternalCountryId,
-                        principalTable: "InternalCountries",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateIndex(
@@ -77,11 +71,6 @@ namespace InternalDb.Migrations
                 name: "IX_InternalOffices_CityId",
                 table: "InternalOffices",
                 column: "CityId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_InternalOffices_InternalCountryId",
-                table: "InternalOffices",
-                column: "InternalCountryId");
         }
 
         /// <inheritdoc />
