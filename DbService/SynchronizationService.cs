@@ -4,12 +4,12 @@ namespace DbService
 {
     public class SynchronizationService : ISynchronizationService
     {
-        private readonly SyncService _syncService;
+        private readonly SyncHelper _syncService;
         public SynchronizationService(
         
-        ILogger<SyncService> logger)
+        ILogger<SyncHelper> logger)
         {
-            _syncService = new SyncService(logger);
+            _syncService = new SyncHelper(logger);
         }
 
         /// <summary>

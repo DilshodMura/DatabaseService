@@ -8,11 +8,11 @@ using System.Data;
 
 namespace DbService
 {
-    public class SyncService:BackgroundService
+    public class SyncHelper:BackgroundService
     {
-        private readonly ILogger<SyncService> _logger;
+        private readonly ILogger<SyncHelper> _logger;
 
-        public SyncService(ILogger<SyncService> logger)
+        public SyncHelper(ILogger<SyncHelper> logger)
         {
             _logger = logger;
         }
