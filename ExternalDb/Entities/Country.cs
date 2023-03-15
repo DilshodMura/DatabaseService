@@ -18,6 +18,6 @@ namespace ExternalDb.Entities
         /// <summary>
         /// Gets or sets the list of cities for external country table
         /// </summary>
-        public List<ExternalCity> Cities { get; set; } = new List<ExternalCity>();
+        public IEnumerable<ExternalCity> Cities { get; set; } = new List<ExternalCity>();
     }
 }

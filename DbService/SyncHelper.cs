@@ -61,8 +61,8 @@ namespace DbService
             var externalCountries = await _externalDbContext.ExternalCountries.ToListAsync();
 
             // Identify the differences between the two sets of data
-            var internalIds = internalCountries.Select(c => c.Id).ToHashSet();
-            var externalIds = externalCountries.Select(c => c.Id).ToHashSet();
+            var internalIds = internalCountries.Select(c => c.Id).ToList();
+            var externalIds = externalCountries.Select(c => c.Id).ToList();
             var missingIds = externalIds.Except(internalIds).ToList();
             var extraIds = internalIds.Except(externalIds).ToList();
             var modifiedIds = internalIds.Intersect(externalIds).Where(id => {
@@ -82,14 +82,14 @@ namespace DbService
                 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DeletedCountries')
                 BEGIN
                     CREATE TABLE DeletedCountries (
-                        Id INT PRIMARY KEY,
+                        Id INT,
                         Name NVARCHAR(100) NOT NULL
                     )
                 END
                 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DeletedCities')
                 BEGIN
                     CREATE TABLE DeletedCities (
-                    Id INT PRIMARY KEY,
+                    Id INT,
                     Name NVARCHAR(100) NOT NULL,
                     CountryId INT NOT NULL
                 )
@@ -97,7 +97,7 @@ namespace DbService
                 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DeletedOffices')
                 BEGIN
                     CREATE TABLE DeletedOffices (
-                    Id INT PRIMARY KEY,
+                    Id INT,
                     Name NVARCHAR(100) NOT NULL,
                     CityId INT NOT NULL
                 )
@@ -145,7 +145,11 @@ namespace DbService
                 _dbContext.InternalCountries.Remove(internalCountry);
 
                 // Remove linked cities and offices from the internal database
-                var internalCities = await _dbContext.InternalCities.Where(c => c.CountryId == internalCountry.Id).ToListAsync();
+                var internalCities = await _dbContext.InternalCities
+                                                        .Include(c => c.Offices)
+                                                        .Where(c => c.CountryId == internalCountry.Id)
+                                                        .ToListAsync();
+
                 foreach (var internalCity in internalCities)
                 {
                     parameters[0].Value = internalCity.Id;
@@ -213,27 +217,77 @@ namespace DbService
                         Name = internalCity.Name,
                         CountryId = internalCity.CountryId
                     };
-                    _externalDbContext.ExternalCities.Add(externalCity);
+                    await _externalDbContext.ExternalCities.AddAsync(externalCity);
                 }
                 else
                 {
                     // If the city already exists in the external database, update its properties
                     externalCity.Name = internalCity.Name;
                     externalCity.CountryId = internalCity.CountryId;
-                    _externalDbContext.ExternalCities.Update(externalCity);
+                    _externalDbContext.ExternalCities.UpdateRange(externalCity);
                 }
             }
+            await _externalDbContext.SaveChangesAsync();
 
-            // Loop through the external cities and remove the ones that do not exist in the internal database
+            // Check if DeletedCities table exists and create it if it doesn't
+            await _externalDbContext.Database.ExecuteSqlRawAsync(@"
+                    IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DeletedCities')
+                BEGIN
+                    CREATE TABLE DeletedCities (
+                    Id INT,
+                    Name NVARCHAR(100) NOT NULL,
+                    CountryId INT NOT NULL
+                )
+                END
+                ");
+
+            // Check if DeletedOffices table exists and create it if it doesn't
+                await _externalDbContext.Database.ExecuteSqlRawAsync(@"
+                    IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DeletedOffices')
+                BEGIN
+                    CREATE TABLE DeletedOffices (
+                    Id INT,
+                    Name NVARCHAR(100) NOT NULL,
+                    CityId INT NOT NULL
+                )
+                END
+                ");
+
+            // Loop through internal cities and delete corresponding external cities and offices
             foreach (var externalCity in externalCities)
             {
                 var internalCity = internalCities.FirstOrDefault(c => c.Id == externalCity.Id);
 
                 if (internalCity == null)
                 {
+                    // City does not exist in internal database, delete it and its linked offices
+                    var externalOffices = await _externalDbContext.ExternalOffices.Where(o => o.CityId == externalCity.Id).ToListAsync();
+                    foreach (var externalOffice in externalOffices)
+                    {
+                        // Add the office to DeletedOffices table
+                        await _externalDbContext.Database.ExecuteSqlRawAsync(@"
+                        INSERT INTO DeletedOffices (Id, Name, CityId)
+                        VALUES (@id, @name, @cityId)
+                    ",
+                        new SqlParameter("@id", externalOffice.Id),
+                        new SqlParameter("@name", externalOffice.Name),
+                        new SqlParameter("@cityId", externalOffice.CityId));
+                        // Remove the office from the external database
+                        _externalDbContext.ExternalOffices.Remove(externalOffice);
+                    }
+                    // Add the city to DeletedCities table
+                    await _externalDbContext.Database.ExecuteSqlRawAsync(@"
+                    INSERT INTO DeletedCities (Id, Name, CountryId)
+                    VALUES (@id, @name, @countryId)
+                ",
+                    new SqlParameter("@id", externalCity.Id),
+                    new SqlParameter("@name", externalCity.Name),
+                    new SqlParameter("@countryId", externalCity.CountryId));
+                    // Remove the city from the external database
                     _externalDbContext.ExternalCities.Remove(externalCity);
                 }
             }
+            // Save changes to external database
             await _externalDbContext.SaveChangesAsync();
         }
 
@@ -282,6 +336,31 @@ namespace DbService
 
                 if (internalOffice == null)
                 {
+                    // If the DeletedOffices table does not exist, create it
+                    if (!_externalDbContext.Database.GetPendingMigrations().Any(m => m == "CreateDeletedOfficesTable"))
+                    {
+                        await _externalDbContext.Database.ExecuteSqlRawAsync(@"
+                             IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DeletedOffices')
+                            BEGIN
+                                CREATE TABLE DeletedOffices (
+                                Id INT,
+                                Name NVARCHAR(100) NOT NULL,
+                                CityId INT NOT NULL
+                            )
+                            END
+                        ");
+                    }
+
+                    // Add the office to DeletedOffices table
+                    await _externalDbContext.Database.ExecuteSqlRawAsync(@"
+                        INSERT INTO DeletedOffices (Id, Name, CityId)
+                        VALUES (@id, @name, @cityId)
+                    ",
+                    new SqlParameter("@id", externalOffice.Id),
+                    new SqlParameter("@name", externalOffice.Name),
+                    new SqlParameter("@cityId", externalOffice.CityId));
+
+                    // Remove the office from the external database
                     _externalDbContext.ExternalOffices.Remove(externalOffice);
                 }
             }

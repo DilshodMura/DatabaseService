@@ -25,6 +25,6 @@ namespace ExternalDb.Entities
         /// <summary>
         /// Gets or sets the list of offices for internal city table
         /// </summary>
-        public List<ExternalOffice> Offices { get; set; } = new List<ExternalOffice>();
+        public IEnumerable<ExternalOffice> Offices { get; set; } = new List<ExternalOffice>();
     }
 }

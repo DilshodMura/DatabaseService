@@ -5,7 +5,7 @@
 namespace InternalDb.Migrations
 {
     /// <inheritdoc />
-    public partial class testInt : Migration
+    public partial class inttest : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

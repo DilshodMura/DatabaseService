@@ -5,7 +5,7 @@
 namespace ExternalDb.Migrations
 {
     /// <inheritdoc />
-    public partial class testExt2 : Migration
+    public partial class exttest : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
